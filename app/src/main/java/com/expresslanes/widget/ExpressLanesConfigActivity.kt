@@ -24,6 +24,11 @@ class ExpressLanesConfigActivity : AppCompatActivity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
+    override fun onResume() {
+        super.onResume()
+        ExpressLanesUpdateReceiver.scheduleIfWidgetsExist(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)

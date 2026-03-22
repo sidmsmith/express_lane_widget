@@ -2,7 +2,9 @@ package com.expresslanes.widget
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -110,19 +112,13 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
         val intervalMs = intervalMin * 60 * 1000L
         val triggerTime = System.currentTimeMillis() + intervalMs
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP, triggerTime, pending
-                )
-            } else {
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP, triggerTime, pending
-                )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val showIntent = Intent(context, ExpressLanesConfigActivity::class.java).let {
+                PendingIntent.getActivity(context, 1, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP, triggerTime, pending
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerTime, showIntent),
+                pending
             )
         } else {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pending)
@@ -156,22 +152,29 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
             val intervalMs = intervalMin * 60 * 1000L
             val triggerTime = System.currentTimeMillis() + intervalMs
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP, triggerTime, pending
-                    )
-                } else {
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP, triggerTime, pending
-                    )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val showIntent = Intent(context, ExpressLanesConfigActivity::class.java).let {
+                    PendingIntent.getActivity(context, 1, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 }
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP, triggerTime, pending
+                alarmManager.setAlarmClock(
+                    AlarmManager.AlarmClockInfo(triggerTime, showIntent),
+                    pending
                 )
             } else {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pending)
+            }
+        }
+
+        /**
+         * Schedules the next update alarm only if at least one widget instance exists.
+         * Use when app is opened or device boots to re-establish the alarm.
+         */
+        fun scheduleIfWidgetsExist(context: Context) {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val componentName = ComponentName(context, ExpressLanesWidgetProvider::class.java)
+            val widgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            if (widgetIds.isNotEmpty()) {
+                schedule(context)
             }
         }
 

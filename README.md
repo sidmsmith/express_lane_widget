@@ -40,6 +40,19 @@ Or:
 - **Click URL**: Default https://511ga.org; change to open a different link when tapping the widget
 - **Notifications**: Each notification type can be enabled or disabled independently (no code changes required)
 
+## Reliability
+
+The app uses several mechanisms to keep updates running:
+
+- **Boot receiver**: Re-schedules the update alarm when the device reboots (alarms don't survive reboots).
+- **App open**: Opening the config screen re-establishes the alarm, so opening the app periodically helps ensure updates continue.
+- **setAlarmClock**: Uses Android's most reliable alarm type so updates run even when the device is in Doze. You may see a "next alarm" or clock icon in the status bar—this is normal and helps ensure the widget keeps updating.
+
+**If updates stop**: Some devices aggressively restrict background apps. Try:
+1. Open the app (config screen) to re-schedule the alarm.
+2. In **Settings → Apps → Express Lanes Widget → Battery**, set to "Unrestricted" or "Don't optimize".
+3. Ensure the widget is on your home screen; the alarm is only active when at least one widget instance exists.
+
 ## Troubleshooting
 
 The config screen shows the **last 3 API responses** with timestamps (e.g., "Sunday 3/22 1:35 AM: {response}"). Scroll down the config page to see all entries. The raw `LastUpdated` field includes a human-readable suffix (e.g., "Mon 3:45 PM ET"). Error responses (network failures, HTTP errors, parse errors) appear in red.
@@ -70,6 +83,20 @@ The widget parses the 511 GA API response using `Description` and `Status` field
 | Any other case (unexpected state) | Closed | Yes |
 
 When the result is marked **Odd? Yes**, an "odd response" notification is shown (if enabled), and the raw API JSON is saved for display in the config screen.
+
+## Development
+
+Project rules (Cursor `.cursor/rules/express-lanes-build-sync.mdc`): after any change under `express_lanes_widget/`:
+
+1. Run `npm run build`
+2. `git add` changed files (`.gitignore` excludes build artifacts)
+3. `git commit -m "..."` with a clear message
+4. `git push origin main`
+
+```bash
+cd express_lanes_widget && npm run build && git add -A && git status
+git commit -m "Descriptive message" && git push origin main
+```
 
 ## Requirements
 
