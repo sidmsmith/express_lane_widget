@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Green up arrow (scaled for 108dp) - transparent background -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Stem -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M40,45 L68,45 L68,108 L40,108 Z"/>
+    <!-- Arrow head -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M9,45 L54,0 L99,45 Z"/>
+</vector>

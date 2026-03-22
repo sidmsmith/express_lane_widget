@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Express Lanes Widget</string>
+    <string name="widget_name">Express Lanes</string>
+    <string name="config_title">Express Lanes Settings</string>
+    <string name="config_update_frequency">Update frequency (minutes)</string>
+    <string name="config_api_key">API Key</string>
+    <string name="config_save">Save</string>
+    <string name="config_url">Click URL (e.g. https://511ga.org)</string>
+    <string name="config_notify_on_change">Notify when status changes</string>
+    <string name="config_notify_when_stale">Notify when data &gt; 24 hours old</string>
+    <string name="config_notify_on_odd">Notify on odd/unexpected API response</string>
+    <string name="config_last_response">Last API response (troubleshooting)</string>
+    <string name="config_no_data">No data yet</string>
+</resources>

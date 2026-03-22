@@ -1,0 +1,9 @@
+{
+  "name": "express-lanes-widget",
+  "version": "1.0.0",
+  "description": "Android widget for 511 GA Express Lanes status",
+  "scripts": {
+    "build": "gradlew.bat assembleDebug",
+    "sync": "gradlew.bat build"
+  }
+}
