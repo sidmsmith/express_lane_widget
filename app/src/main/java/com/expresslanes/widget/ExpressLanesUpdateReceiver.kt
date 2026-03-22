@@ -28,25 +28,37 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                 ExpressLanesWidgetProvider.updateAllWidgets(context, result.status)
 
                 val lastStatus = prefs.getString(WidgetPrefs.KEY_LAST_STATUS, null)
-                prefs.edit()
-                    .putString(WidgetPrefs.KEY_LAST_STATUS, result.status.name)
-                    .putString(WidgetPrefs.KEY_LAST_API_RESPONSE, result.rawJson)
-                    .apply()
+                prefs.edit().putString(WidgetPrefs.KEY_LAST_STATUS, result.status.name).apply()
+                WidgetPrefs.appendApiResponseHistory(context, result.rawJson)
 
                 val statusChanged = lastStatus != null && lastStatus != result.status.name
                 val notifyOnChange = prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_ON_CHANGE, WidgetPrefs.DEFAULT_NOTIFY_ON_CHANGE)
                 val notifyWhenStale = prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_WHEN_STALE, WidgetPrefs.DEFAULT_NOTIFY_WHEN_STALE)
                 val notifyOnOdd = prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_ON_ODD, WidgetPrefs.DEFAULT_NOTIFY_ON_ODD)
+                val suppressRepeat = prefs.getBoolean(WidgetPrefs.KEY_SUPPRESS_REPEAT, WidgetPrefs.DEFAULT_SUPPRESS_REPEAT)
+                val lastWasStale = prefs.getBoolean(WidgetPrefs.KEY_LAST_WAS_STALE, false)
+                val lastWasOdd = prefs.getBoolean(WidgetPrefs.KEY_LAST_WAS_ODD, false)
+
+                val isStale = result.lastUpdatedSeconds?.let { lastUp ->
+                    val nowSec = System.currentTimeMillis() / 1000
+                    nowSec - lastUp > WidgetPrefs.STALE_THRESHOLD_SECONDS
+                } ?: false
+
+                val editor = prefs.edit()
+                    .putBoolean(WidgetPrefs.KEY_LAST_WAS_STALE, isStale)
+                    .putBoolean(WidgetPrefs.KEY_LAST_WAS_ODD, result.isOddResponse)
 
                 if (statusChanged && notifyOnChange) {
                     val msg = "NW Corridor: ${result.status.name}"
                     NotificationHelper.show(context, "Express Lane Status Changed", msg, NOTIFY_CHANGE)
                 }
 
-                result.lastUpdatedSeconds?.let { lastUp ->
-                    val nowSec = System.currentTimeMillis() / 1000
-                    if (nowSec - lastUp > WidgetPrefs.STALE_THRESHOLD_SECONDS && notifyWhenStale) {
-                        val hours = (nowSec - lastUp) / 3600
+                if (isStale && notifyWhenStale) {
+                    val shouldNotify = !suppressRepeat || !lastWasStale
+                    if (shouldNotify) {
+                        val hours = result.lastUpdatedSeconds?.let { lastUp ->
+                            (System.currentTimeMillis() / 1000 - lastUp) / 3600
+                        } ?: 0
                         NotificationHelper.show(
                             context,
                             "Express Lane Data Stale",
@@ -57,17 +69,23 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                 }
 
                 if (result.isOddResponse && notifyOnOdd) {
-                    val snippet = result.rawJson.take(500) + if (result.rawJson.length > 500) "…" else ""
-                    NotificationHelper.show(
-                        context,
-                        "Odd API Response (NW Corridor)",
-                        "Unexpected response. Raw data:\n$snippet",
-                        NOTIFY_ODD
-                    )
+                    val shouldNotify = !suppressRepeat || !lastWasOdd
+                    if (shouldNotify) {
+                        val snippet = result.rawJson.take(500) + if (result.rawJson.length > 500) "…" else ""
+                        NotificationHelper.show(
+                            context,
+                            "Odd API Response (NW Corridor)",
+                            "Unexpected response. Raw data:\n$snippet",
+                            NOTIFY_ODD
+                        )
+                    }
                 }
+
+                editor.apply()
             } catch (e: Exception) {
                 Log.e(TAG, "Update failed", e)
                 ExpressLanesWidgetProvider.updateAllWidgets(context, ExpressLaneStatus.CLOSED)
+                WidgetPrefs.appendApiResponseHistory(context, "Error: ${e.message}")
             } finally {
                 scheduleNext(context)
                 pendingResult.finish()
@@ -78,7 +96,7 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
     private fun scheduleNext(context: Context) {
         val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
         val intervalMin = prefs.getInt(WidgetPrefs.KEY_UPDATE_INTERVAL, WidgetPrefs.DEFAULT_UPDATE_INTERVAL)
-            .coerceIn(5, 60)
+            .coerceIn(1, 60)
 
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ExpressLanesUpdateReceiver::class.java).apply {
@@ -124,7 +142,7 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
             cancel(context)
             val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
             val intervalMin = prefs.getInt(WidgetPrefs.KEY_UPDATE_INTERVAL, WidgetPrefs.DEFAULT_UPDATE_INTERVAL)
-                .coerceIn(5, 60)
+                .coerceIn(1, 60)
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, ExpressLanesUpdateReceiver::class.java).apply {

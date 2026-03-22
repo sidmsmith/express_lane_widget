@@ -77,7 +77,13 @@
             android:id="@+id/switch_notify_odd"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/config_notify_on_odd"
+            android:text="@string/config_notify_on_odd" />
+
+        <Switch
+            android:id="@+id/switch_suppress_repeat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/config_suppress_repeat"
             android:layout_marginBottom="16dp" />
 
         <TextView
@@ -87,20 +93,18 @@
             android:textSize="14sp"
             android:layout_marginBottom="4dp" />
 
-        <ScrollView
+        <TextView
+            android:id="@+id/text_last_response"
             android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:background="#f5f5f5"
+            android:layout_height="wrap_content"
+            android:minHeight="120dp"
+            android:background="#FFFFFF"
             android:padding="8dp"
-            android:layout_marginBottom="24dp">
-            <TextView
-                android:id="@+id/text_last_response"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/config_no_data"
-                android:textSize="11sp"
-                android:fontFamily="monospace" />
-        </ScrollView>
+            android:text="@string/config_no_data"
+            android:textColor="#000000"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:layout_marginBottom="24dp" />
 
         <Button
             android:id="@+id/btn_save"

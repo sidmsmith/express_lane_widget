@@ -46,6 +46,7 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
             val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
             val apiKey = prefs.getString(WidgetPrefs.KEY_API_KEY, WidgetPrefs.DEFAULT_API_KEY) ?: WidgetPrefs.DEFAULT_API_KEY
             val result = ExpressLanesRepository.fetchNorthwestCorridor(apiKey)
+            WidgetPrefs.appendApiResponseHistory(context, result.rawJson)
             updateWidget(context, appWidgetManager, appWidgetId, result.status)
         }
     }
