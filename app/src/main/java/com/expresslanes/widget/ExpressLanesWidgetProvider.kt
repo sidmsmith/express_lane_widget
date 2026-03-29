@@ -47,7 +47,7 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
             val apiKey = prefs.getString(WidgetPrefs.KEY_API_KEY, WidgetPrefs.DEFAULT_API_KEY) ?: WidgetPrefs.DEFAULT_API_KEY
             val result = ExpressLanesRepository.fetchNorthwestCorridor(apiKey)
             WidgetPrefs.appendApiResponseHistory(context, result.rawJson)
-            updateWidget(context, appWidgetManager, appWidgetId, result.status)
+            updateWidget(context, appWidgetManager, appWidgetId, result)
         }
     }
 
@@ -55,9 +55,9 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int,
-        status: ExpressLaneStatus
+        result: FetchResult
     ) {
-        ExpressLanesWidgetProvider.updateWidgetViews(context, appWidgetManager, appWidgetId, status)
+        ExpressLanesWidgetProvider.updateWidgetViews(context, appWidgetManager, appWidgetId, result)
     }
 
     private fun schedulePeriodicWork(context: Context) {
@@ -79,11 +79,11 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
         const val ACTION_OPEN_URL = "com.expresslanes.widget.OPEN_URL"
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-        fun updateAllWidgets(context: Context, status: ExpressLaneStatus) {
+        fun updateAllWidgets(context: Context, result: FetchResult) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val ids = appWidgetManager.getAppWidgetIds(ComponentName(context, ExpressLanesWidgetProvider::class.java))
             for (id in ids) {
-                updateWidgetViews(context, appWidgetManager, id, status)
+                updateWidgetViews(context, appWidgetManager, id, result)
             }
         }
 
@@ -91,15 +91,10 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
             context: Context,
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int,
-            status: ExpressLaneStatus
+            result: FetchResult
         ) {
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
-            val iconRes = when (status) {
-                ExpressLaneStatus.NORTHBOUND -> R.drawable.ic_arrow_up_green
-                ExpressLaneStatus.SOUTHBOUND -> R.drawable.ic_arrow_down_yellow
-                ExpressLaneStatus.CLOSED -> R.drawable.ic_close_red
-                ExpressLaneStatus.UNKNOWN -> R.drawable.ic_unknown
-            }
+            val iconRes = iconFor(result.status, result.fromPeachPassFallback)
             views.setImageViewResource(R.id.status_icon, iconRes)
 
             val openUrlIntent = Intent(context, ExpressLanesWidgetProvider::class.java).apply {
@@ -111,6 +106,18 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
             )
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
+
+        /** Green arrows when 511 GA is fresh; yellow arrows when Peach Pass fallback is used. */
+        internal fun iconFor(status: ExpressLaneStatus, fromPeachPassFallback: Boolean): Int {
+            return when (status) {
+                ExpressLaneStatus.NORTHBOUND ->
+                    if (fromPeachPassFallback) R.drawable.ic_arrow_up_yellow else R.drawable.ic_arrow_up_green
+                ExpressLaneStatus.SOUTHBOUND ->
+                    if (fromPeachPassFallback) R.drawable.ic_arrow_down_yellow else R.drawable.ic_arrow_down_green
+                ExpressLaneStatus.CLOSED -> R.drawable.ic_close_red
+                ExpressLaneStatus.UNKNOWN -> R.drawable.ic_unknown
+            }
         }
     }
 }

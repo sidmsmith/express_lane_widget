@@ -1,10 +1,10 @@
 # Express Lanes Widget
 
-Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status from the 511 GA API.
+Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status from the **511 GA API**, with a **Peach Pass** fallback when 511 fails or `LastUpdated` is older than 24 hours.
 
 ## Features
 
-- **Status icons**: Green up arrow (Northbound), yellow down arrow (Southbound), red X (Closed)
+- **Status icons**: **Green** up/down when 511 GA returns fresh data; **yellow** up/down when status comes from Peach Pass fallback; red X (Closed)
 - **Periodic updates**: Configurable 1, 3, 5, 15, 30, or 60 minute intervals via AlarmManager
 - **Click**: Opens 511ga.org (configurable URL)
 - **Notifications**: Optional alerts for status changes, stale data, and odd API responses
@@ -48,8 +48,10 @@ The app uses several mechanisms to keep updates running:
 - **App open**: Opening the config screen re-establishes the alarm, so opening the app periodically helps ensure updates continue.
 - **setAlarmClock**: Uses Android's most reliable alarm type so updates run even when the device is in Doze. You may see a "next alarm" or clock icon in the status bar—this is normal and helps ensure the widget keeps updating.
 
+**Manual refresh**: Tap the refresh icon in the title bar to call the API on demand and verify it's working. This also re-schedules the alarm and updates the API response display.
+
 **If updates stop**: Some devices aggressively restrict background apps. Try:
-1. Open the app (config screen) to re-schedule the alarm.
+1. Open the app and tap the refresh icon (or just opening re-schedules the alarm).
 2. In **Settings → Apps → Express Lanes Widget → Battery**, set to "Unrestricted" or "Don't optimize".
 3. Ensure the widget is on your home screen; the alarm is only active when at least one widget instance exists.
 
@@ -83,6 +85,14 @@ The widget parses the 511 GA API response using `Description` and `Status` field
 | Any other case (unexpected state) | Closed | Yes |
 
 When the result is marked **Odd? Yes**, an "odd response" notification is shown (if enabled), and the raw API JSON is saved for display in the config screen.
+
+## Peach Pass fallback
+
+If 511 GA is unreachable, returns HTTP error, has no 75B entry, parse is odd, or **75B `LastUpdated` is older than 24 hours**, the app calls:
+
+`https://peachpass.com/wp-admin/admin-ajax.php?action=pp_lane_status`
+
+It reads `data.north` (case-insensitive): requires **"open"** plus **"north"** or **"south"** to set direction; otherwise closed/odd. Fallback responses are logged in the config troubleshooting area (511 snapshot + Peach Pass body).
 
 ## Development
 

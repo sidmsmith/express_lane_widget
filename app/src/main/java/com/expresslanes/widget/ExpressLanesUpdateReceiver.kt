@@ -7,6 +7,8 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
@@ -27,7 +29,7 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                     ?: WidgetPrefs.DEFAULT_API_KEY
 
                 val result = ExpressLanesRepository.fetchNorthwestCorridor(apiKey)
-                ExpressLanesWidgetProvider.updateAllWidgets(context, result.status)
+                ExpressLanesWidgetProvider.updateAllWidgets(context, result)
 
                 val lastStatus = prefs.getString(WidgetPrefs.KEY_LAST_STATUS, null)
                 prefs.edit().putString(WidgetPrefs.KEY_LAST_STATUS, result.status.name).apply()
@@ -55,7 +57,8 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                     NotificationHelper.show(context, "Express Lane Status Changed", msg, NOTIFY_CHANGE)
                 }
 
-                if (isStale && notifyWhenStale) {
+                val peachOk = result.fromPeachPassFallback && !result.isOddResponse
+                if (isStale && notifyWhenStale && !peachOk) {
                     val shouldNotify = !suppressRepeat || !lastWasStale
                     if (shouldNotify) {
                         val hours = result.lastUpdatedSeconds?.let { lastUp ->
@@ -71,7 +74,8 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                 }
 
                 if (result.isOddResponse && notifyOnOdd) {
-                    val shouldNotify = !suppressRepeat || !lastWasOdd
+                    val hasNetwork = hasValidNetworkConnection(context)
+                    val shouldNotify = hasNetwork && (!suppressRepeat || !lastWasOdd)
                     if (shouldNotify) {
                         val snippet = result.rawJson.take(500) + if (result.rawJson.length > 500) "…" else ""
                         NotificationHelper.show(
@@ -86,7 +90,16 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                 editor.apply()
             } catch (e: Exception) {
                 Log.e(TAG, "Update failed", e)
-                ExpressLanesWidgetProvider.updateAllWidgets(context, ExpressLaneStatus.CLOSED)
+                ExpressLanesWidgetProvider.updateAllWidgets(
+                    context,
+                    FetchResult(
+                        ExpressLaneStatus.CLOSED,
+                        isOddResponse = true,
+                        rawJson = "Error: ${e.message}",
+                        lastUpdatedSeconds = null,
+                        fromPeachPassFallback = false
+                    )
+                )
                 WidgetPrefs.appendApiResponseHistory(context, "Error: ${e.message}")
             } finally {
                 scheduleNext(context)
@@ -123,6 +136,14 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
         } else {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pending)
         }
+    }
+
+    private fun hasValidNetworkConnection(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     companion object {

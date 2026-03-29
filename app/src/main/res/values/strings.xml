@@ -13,4 +13,5 @@
     <string name="config_suppress_repeat">Suppress repeated notifications (notify only when state changes)</string>
     <string name="config_last_response">Last 3 API responses (troubleshooting)</string>
     <string name="config_no_data">No data yet</string>
+    <string name="action_refresh">Refresh now</string>
 </resources>

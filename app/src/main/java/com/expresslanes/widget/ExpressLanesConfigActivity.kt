@@ -11,22 +11,56 @@ import java.util.Locale
 import java.util.TimeZone
 import android.content.ComponentName
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ExpressLanesConfigActivity : AppCompatActivity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     override fun onResume() {
         super.onResume()
         ExpressLanesUpdateReceiver.scheduleIfWidgetsExist(this)
+        registerResponseHistoryListener()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterResponseHistoryListener()
+    }
+
+    private fun registerResponseHistoryListener() {
+        if (prefsListener != null) return
+        prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == WidgetPrefs.KEY_API_RESPONSE_HISTORY) {
+                runOnUiThread { updateResponseDisplay() }
+            }
+        }
+        getSharedPreferences(WidgetPrefs.PREFS_NAME, MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    private fun unregisterResponseHistoryListener() {
+        prefsListener?.let { listener ->
+            getSharedPreferences(WidgetPrefs.PREFS_NAME, MODE_PRIVATE)
+                .unregisterOnSharedPreferenceChangeListener(listener)
+            prefsListener = null
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +70,7 @@ class ExpressLanesConfigActivity : AppCompatActivity() {
         appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
 
         setContentView(R.layout.activity_config)
+        supportActionBar?.setTitle(R.string.config_title)
 
         val prefs = getSharedPreferences(WidgetPrefs.PREFS_NAME, MODE_PRIVATE)
 
@@ -83,41 +118,98 @@ class ExpressLanesConfigActivity : AppCompatActivity() {
             responseView.text = spannable
         }
 
-        findViewById<Button>(R.id.btn_save).setOnClickListener {
-            val interval = intervals[spinner.selectedItemPosition]
-            val apiKey = editApiKey.text.toString().ifBlank { WidgetPrefs.DEFAULT_API_KEY }
-            val url = editUrl.text.toString().ifBlank { WidgetPrefs.DEFAULT_CLICK_URL }
+        findViewById<Button>(R.id.btn_save).setOnClickListener { saveAndFinish() }
+    }
 
-            prefs.edit()
-                .putInt(WidgetPrefs.KEY_UPDATE_INTERVAL, interval)
-                .putString(WidgetPrefs.KEY_API_KEY, apiKey)
-                .putString(WidgetPrefs.KEY_CLICK_URL, url)
-                .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_CHANGE, findViewById<Switch>(R.id.switch_notify_change).isChecked)
-                .putBoolean(WidgetPrefs.KEY_NOTIFY_WHEN_STALE, findViewById<Switch>(R.id.switch_notify_stale).isChecked)
-                .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_ODD, findViewById<Switch>(R.id.switch_notify_odd).isChecked)
-                .putBoolean(WidgetPrefs.KEY_SUPPRESS_REPEAT, findViewById<Switch>(R.id.switch_suppress_repeat).isChecked)
-                .apply()
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_config, menu)
+        return true
+    }
 
-            val appWidgetManager = AppWidgetManager.getInstance(this)
-            val ids = if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                intArrayOf(appWidgetId)
-            } else {
-                appWidgetManager.getAppWidgetIds(ComponentName(this, ExpressLanesWidgetProvider::class.java))
-            }
-            if (ids.isNotEmpty()) {
-                val updateIntent = Intent(this, ExpressLanesWidgetProvider::class.java).apply {
-                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-                }
-                sendBroadcast(updateIntent)
-            }
-
-            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                val resultIntent = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                setResult(RESULT_OK, resultIntent)
-            }
-            finish()
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.action_refresh) {
+            refreshNow()
+            return true
         }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private fun refreshNow() {
+        lifecycleScope.launch {
+            val apiKey = getSharedPreferences(WidgetPrefs.PREFS_NAME, MODE_PRIVATE)
+                .getString(WidgetPrefs.KEY_API_KEY, WidgetPrefs.DEFAULT_API_KEY) ?: WidgetPrefs.DEFAULT_API_KEY
+            val result = withContext(Dispatchers.IO) {
+                ExpressLanesRepository.fetchNorthwestCorridor(apiKey)
+            }
+            ExpressLanesWidgetProvider.updateAllWidgets(this@ExpressLanesConfigActivity, result)
+            WidgetPrefs.appendApiResponseHistory(this@ExpressLanesConfigActivity, result.rawJson)
+            ExpressLanesUpdateReceiver.scheduleIfWidgetsExist(this@ExpressLanesConfigActivity)
+            updateResponseDisplay()
+            Toast.makeText(this@ExpressLanesConfigActivity, "Refreshed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateResponseDisplay() {
+        val history = WidgetPrefs.getApiResponseHistory(this)
+        val responseView = findViewById<TextView>(R.id.text_last_response)
+        if (history.isEmpty()) {
+            responseView.text = getString(R.string.config_no_data)
+        } else {
+            val spannable = SpannableStringBuilder()
+            for ((index, entry) in history.withIndex()) {
+                val processed = addLastUpdatedSuffix(entry)
+                val start = spannable.length
+                spannable.append(processed)
+                val isError = entry.contains("Error:", ignoreCase = true) ||
+                    entry.startsWith("HTTP ") ||
+                    entry.contains("Parse error", ignoreCase = true)
+                val color = if (isError) Color.RED else Color.BLACK
+                spannable.setSpan(ForegroundColorSpan(color), start, spannable.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                if (index < history.size - 1) spannable.append("\n\n---\n\n")
+            }
+            responseView.text = spannable
+        }
+    }
+
+    private fun saveAndFinish() {
+        val prefs = getSharedPreferences(WidgetPrefs.PREFS_NAME, MODE_PRIVATE)
+        val spinner = findViewById<Spinner>(R.id.spinner_interval)
+        val intervals = arrayOf(1, 3, 5, 15, 30, 60)
+        val interval = intervals[spinner.selectedItemPosition]
+        val editApiKey = findViewById<EditText>(R.id.edit_api_key)
+        val editUrl = findViewById<EditText>(R.id.edit_url)
+        val apiKey = editApiKey.text.toString().ifBlank { WidgetPrefs.DEFAULT_API_KEY }
+        val url = editUrl.text.toString().ifBlank { WidgetPrefs.DEFAULT_CLICK_URL }
+
+        prefs.edit()
+            .putInt(WidgetPrefs.KEY_UPDATE_INTERVAL, interval)
+            .putString(WidgetPrefs.KEY_API_KEY, apiKey)
+            .putString(WidgetPrefs.KEY_CLICK_URL, url)
+            .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_CHANGE, findViewById<Switch>(R.id.switch_notify_change).isChecked)
+            .putBoolean(WidgetPrefs.KEY_NOTIFY_WHEN_STALE, findViewById<Switch>(R.id.switch_notify_stale).isChecked)
+            .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_ODD, findViewById<Switch>(R.id.switch_notify_odd).isChecked)
+            .putBoolean(WidgetPrefs.KEY_SUPPRESS_REPEAT, findViewById<Switch>(R.id.switch_suppress_repeat).isChecked)
+            .apply()
+
+        val appWidgetManager = AppWidgetManager.getInstance(this)
+        val ids = if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            intArrayOf(appWidgetId)
+        } else {
+            appWidgetManager.getAppWidgetIds(ComponentName(this, ExpressLanesWidgetProvider::class.java))
+        }
+        if (ids.isNotEmpty()) {
+            val updateIntent = Intent(this, ExpressLanesWidgetProvider::class.java).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            }
+            sendBroadcast(updateIntent)
+        }
+
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            val resultIntent = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            setResult(RESULT_OK, resultIntent)
+        }
+        finish()
     }
 
     /**
