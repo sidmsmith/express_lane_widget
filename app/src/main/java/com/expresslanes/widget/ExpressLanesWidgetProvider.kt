@@ -29,15 +29,19 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_OPEN_URL) {
-            val url = getClickUrl(context)
-            try {
-                val i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(i)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to open URL", e)
-            }
+        when (intent.action) {
+            ACTION_OPEN_URL -> openUrl(context, getClickUrl(context))
+            ACTION_OPEN_CAMERA_URL -> openUrl(context, getCameraUrl(context))
+        }
+    }
+
+    private fun openUrl(context: Context, url: String) {
+        try {
+            val i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(i)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open URL: $url", e)
         }
     }
 
@@ -74,9 +78,15 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
         return prefs.getString(WidgetPrefs.KEY_CLICK_URL, WidgetPrefs.DEFAULT_CLICK_URL) ?: WidgetPrefs.DEFAULT_CLICK_URL
     }
 
+    private fun getCameraUrl(context: Context): String {
+        val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(WidgetPrefs.KEY_CAMERA_URL, WidgetPrefs.DEFAULT_CAMERA_URL) ?: WidgetPrefs.DEFAULT_CAMERA_URL
+    }
+
     companion object {
         private const val TAG = "ExpressLanesWidget"
         const val ACTION_OPEN_URL = "com.expresslanes.widget.OPEN_URL"
+        const val ACTION_OPEN_CAMERA_URL = "com.expresslanes.widget.OPEN_CAMERA_URL"
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
         fun updateAllWidgets(context: Context, result: FetchResult) {
@@ -103,6 +113,14 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(
                 R.id.status_icon,
                 PendingIntent.getBroadcast(context, 0, openUrlIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+
+            val cameraIntent = Intent(context, ExpressLanesWidgetProvider::class.java).apply {
+                action = ACTION_OPEN_CAMERA_URL
+            }
+            views.setOnClickPendingIntent(
+                R.id.camera_button,
+                PendingIntent.getBroadcast(context, 1, cameraIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
 
             appWidgetManager.updateAppWidget(appWidgetId, views)

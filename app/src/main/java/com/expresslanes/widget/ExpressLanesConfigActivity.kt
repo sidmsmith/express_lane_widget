@@ -89,6 +89,10 @@ class ExpressLanesConfigActivity : AppCompatActivity() {
         val editUrl = findViewById<EditText>(R.id.edit_url)
         editUrl.setText(prefs.getString(WidgetPrefs.KEY_CLICK_URL, WidgetPrefs.DEFAULT_CLICK_URL))
 
+        findViewById<EditText>(R.id.edit_camera_url).setText(
+            prefs.getString(WidgetPrefs.KEY_CAMERA_URL, WidgetPrefs.DEFAULT_CAMERA_URL)
+        )
+
         findViewById<Switch>(R.id.switch_notify_change).isChecked =
             prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_ON_CHANGE, WidgetPrefs.DEFAULT_NOTIFY_ON_CHANGE)
         findViewById<Switch>(R.id.switch_notify_stale).isChecked =
@@ -178,13 +182,16 @@ class ExpressLanesConfigActivity : AppCompatActivity() {
         val interval = intervals[spinner.selectedItemPosition]
         val editApiKey = findViewById<EditText>(R.id.edit_api_key)
         val editUrl = findViewById<EditText>(R.id.edit_url)
+        val editCameraUrl = findViewById<EditText>(R.id.edit_camera_url)
         val apiKey = editApiKey.text.toString().ifBlank { WidgetPrefs.DEFAULT_API_KEY }
         val url = editUrl.text.toString().ifBlank { WidgetPrefs.DEFAULT_CLICK_URL }
+        val cameraUrl = editCameraUrl.text.toString().ifBlank { WidgetPrefs.DEFAULT_CAMERA_URL }
 
         prefs.edit()
             .putInt(WidgetPrefs.KEY_UPDATE_INTERVAL, interval)
             .putString(WidgetPrefs.KEY_API_KEY, apiKey)
             .putString(WidgetPrefs.KEY_CLICK_URL, url)
+            .putString(WidgetPrefs.KEY_CAMERA_URL, cameraUrl)
             .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_CHANGE, findViewById<Switch>(R.id.switch_notify_change).isChecked)
             .putBoolean(WidgetPrefs.KEY_NOTIFY_WHEN_STALE, findViewById<Switch>(R.id.switch_notify_stale).isChecked)
             .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_ODD, findViewById<Switch>(R.id.switch_notify_odd).isChecked)

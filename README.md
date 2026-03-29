@@ -6,9 +6,10 @@ Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status 
 
 - **Status icons**: **Green** up/down when 511 GA returns fresh data; **yellow** up/down when status comes from Peach Pass fallback; red X (Closed)
 - **Periodic updates**: Configurable 1, 3, 5, 15, 30, or 60 minute intervals via AlarmManager
-- **Click**: Opens 511ga.org (configurable URL)
+- **Main tap** (arrow): Opens 511ga.org (configurable URL)
+- **Camera icon**: Opens a configurable camera image or page (default: SRTA I-75 camera JPG)
 - **Notifications**: Optional alerts for status changes, stale data, and odd API responses
-- **Settings**: Tap the gear icon to configure update frequency, API key, click URL, and notification toggles
+- **Settings**: Tap the gear icon to configure update frequency, API key, main tap URL, camera URL, and notification toggles
 - **Configuration on add**: Settings screen appears when the widget is first added
 
 ## Building
@@ -37,7 +38,8 @@ Or:
 
 - **Update frequency**: 1, 3, 5, 15, 30, or 60 minutes (1 and 3 min for troubleshooting; 5 min recommended for production)
 - **API key**: Default 511 GA API key is pre-filled; change if needed
-- **Click URL**: Default https://511ga.org; change to open a different link when tapping the widget
+- **Main tap URL**: Default https://511ga.org; opens when you tap the status arrow
+- **Camera tap URL**: Default SRTA camera image URL; opens when you tap the small camera icon beside the arrow
 - **Notifications**: Each notification type can be enabled or disabled independently (no code changes required)
 
 ## Reliability

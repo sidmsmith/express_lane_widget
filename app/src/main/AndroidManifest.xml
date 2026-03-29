@@ -53,6 +53,7 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.expresslanes.widget.OPEN_URL" />
+                <action android:name="com.expresslanes.widget.OPEN_CAMERA_URL" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
