@@ -4,7 +4,7 @@ Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status 
 
 ## Features
 
-- **Status icons**: **Green** up/down when 511 GA returns fresh data; **yellow** up/down when status comes from Peach Pass fallback; red X (Closed)
+- **Status icons**: **Green** up/down when 511 GA returns fresh data; **yellow** up/down when Peach Pass fallback gives a clear direction; **red ?** when Peach Pass text includes **transition** (direction unknown, not closed); red **X** when closed or 511 primary closed
 - **Periodic updates**: Configurable 1, 3, 5, 15, 30, or 60 minute intervals via AlarmManager
 - **Widget taps** (one icon, no separate camera button):
   - **Single tap**: Opens the **main URL** (default `https://511ga.org`). There is a short delay (~350 ms) so a second tap can count as a double tap.
@@ -124,8 +124,9 @@ Applied after `success: true` and a non-null `data` object:
 | **open** and **north** (substring) | Northbound | No |
 | **open** and **south** (substring) | Southbound | No |
 | **open** but neither north nor south direction | Closed | Yes |
+| **transition** appears anywhere in `north` (case-insensitive) | *Transition* (red **?** icon) | No — expected; direction unknown, not treated as closed |
 
-When **Unexpected?** is **Yes**, the widget shows a **yellow** closed-style outcome (same as other fallback failures), logs the combined 511 snapshot + Peach Pass body in history, and can fire the **Peach Pass unexpected** notification (if enabled).
+When **Unexpected?** is **Yes**, the widget shows a **yellow** closed-style outcome (same as other fallback failures), logs the combined 511 snapshot + Peach Pass body in history, and can fire the **Peach Pass unexpected** notification (if enabled). The **transition** case uses a red question-mark icon instead of the red X and does **not** count as unexpected.
 
 ## Development
 

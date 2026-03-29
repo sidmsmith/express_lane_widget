@@ -156,6 +156,7 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
                 ExpressLaneStatus.SOUTHBOUND ->
                     if (fromPeachPassFallback) R.drawable.ic_arrow_down_yellow else R.drawable.ic_arrow_down_green
                 ExpressLaneStatus.CLOSED -> R.drawable.ic_close_red
+                ExpressLaneStatus.TRANSITION -> R.drawable.ic_question_red
                 ExpressLaneStatus.UNKNOWN -> R.drawable.ic_unknown
             }
         }

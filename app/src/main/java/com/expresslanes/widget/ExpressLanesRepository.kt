@@ -132,6 +132,9 @@ object ExpressLanesRepository {
             if (north.isEmpty()) {
                 return PeachParse(ExpressLaneStatus.CLOSED, true, body)
             }
+            if ("transition" in north) {
+                return PeachParse(ExpressLaneStatus.TRANSITION, false, body)
+            }
             val hasOpen = "open" in north
             val hasClosed = "closed" in north
             if (!hasOpen && !hasClosed) {
