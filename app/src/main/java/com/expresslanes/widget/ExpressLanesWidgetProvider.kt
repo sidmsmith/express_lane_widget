@@ -7,8 +7,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.RemoteViews
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,19 +32,11 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        when (intent.action) {
-            ACTION_OPEN_URL -> openUrl(context, getClickUrl(context))
-            ACTION_OPEN_CAMERA_URL -> openUrl(context, getCameraUrl(context))
-        }
-    }
-
-    private fun openUrl(context: Context, url: String) {
-        try {
-            val i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(i)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to open URL: $url", e)
+        if (intent.action == ACTION_WIDGET_TAP) {
+            val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+            if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                handleWidgetTap(context.applicationContext, id)
+            }
         }
     }
 
@@ -73,21 +68,50 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
         ExpressLanesUpdateReceiver.cancel(context)
     }
 
-    private fun getClickUrl(context: Context): String {
-        val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(WidgetPrefs.KEY_CLICK_URL, WidgetPrefs.DEFAULT_CLICK_URL) ?: WidgetPrefs.DEFAULT_CLICK_URL
-    }
-
-    private fun getCameraUrl(context: Context): String {
-        val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(WidgetPrefs.KEY_CAMERA_URL, WidgetPrefs.DEFAULT_CAMERA_URL) ?: WidgetPrefs.DEFAULT_CAMERA_URL
-    }
-
     companion object {
         private const val TAG = "ExpressLanesWidget"
-        const val ACTION_OPEN_URL = "com.expresslanes.widget.OPEN_URL"
-        const val ACTION_OPEN_CAMERA_URL = "com.expresslanes.widget.OPEN_CAMERA_URL"
+        const val ACTION_WIDGET_TAP = "com.expresslanes.widget.WIDGET_TAP"
+        private const val DOUBLE_TAP_TIMEOUT_MS = 350L
+
+        private val tapHandler = Handler(Looper.getMainLooper())
+        private val pendingSingleTapByWidget = ConcurrentHashMap<Int, Runnable>()
+
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+        private fun handleWidgetTap(context: Context, appWidgetId: Int) {
+            val pending = pendingSingleTapByWidget.remove(appWidgetId)
+            if (pending != null) {
+                tapHandler.removeCallbacks(pending)
+                openUrl(context, readCameraUrl(context))
+                return
+            }
+            val run = Runnable {
+                pendingSingleTapByWidget.remove(appWidgetId)
+                openUrl(context, readClickUrl(context))
+            }
+            pendingSingleTapByWidget[appWidgetId] = run
+            tapHandler.postDelayed(run, DOUBLE_TAP_TIMEOUT_MS)
+        }
+
+        private fun readClickUrl(context: Context): String {
+            val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getString(WidgetPrefs.KEY_CLICK_URL, WidgetPrefs.DEFAULT_CLICK_URL) ?: WidgetPrefs.DEFAULT_CLICK_URL
+        }
+
+        private fun readCameraUrl(context: Context): String {
+            val prefs = context.getSharedPreferences(WidgetPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getString(WidgetPrefs.KEY_CAMERA_URL, WidgetPrefs.DEFAULT_CAMERA_URL) ?: WidgetPrefs.DEFAULT_CAMERA_URL
+        }
+
+        private fun openUrl(context: Context, url: String) {
+            try {
+                val i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(i)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to open URL: $url", e)
+            }
+        }
 
         fun updateAllWidgets(context: Context, result: FetchResult) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
@@ -107,20 +131,18 @@ class ExpressLanesWidgetProvider : AppWidgetProvider() {
             val iconRes = iconFor(result.status, result.fromPeachPassFallback)
             views.setImageViewResource(R.id.status_icon, iconRes)
 
-            val openUrlIntent = Intent(context, ExpressLanesWidgetProvider::class.java).apply {
-                action = ACTION_OPEN_URL
+            val tapIntent = Intent(context, ExpressLanesWidgetProvider::class.java).apply {
+                action = ACTION_WIDGET_TAP
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             }
             views.setOnClickPendingIntent(
                 R.id.status_icon,
-                PendingIntent.getBroadcast(context, 0, openUrlIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            )
-
-            val cameraIntent = Intent(context, ExpressLanesWidgetProvider::class.java).apply {
-                action = ACTION_OPEN_CAMERA_URL
-            }
-            views.setOnClickPendingIntent(
-                R.id.camera_button,
-                PendingIntent.getBroadcast(context, 1, cameraIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                PendingIntent.getBroadcast(
+                    context,
+                    appWidgetId,
+                    tapIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
             )
 
             appWidgetManager.updateAppWidget(appWidgetId, views)

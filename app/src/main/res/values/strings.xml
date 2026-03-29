@@ -7,10 +7,9 @@
     <string name="config_api_key">API Key</string>
     <string name="config_save">Save</string>
     <string name="config_url">Main tap URL (e.g. https://511ga.org)</string>
-    <string name="config_camera_url">Camera tap URL (image or page)</string>
+    <string name="config_camera_url">Double-tap URL (camera / image or page)</string>
     <string name="config_camera_url_hint">https://…jpg or camera page</string>
-    <string name="widget_status_content_desc">Express lane status</string>
-    <string name="widget_camera_content_desc">Open traffic camera</string>
+    <string name="widget_status_content_desc">Express lane status. Single tap opens main link. Double tap opens camera link.</string>
     <string name="config_notify_on_change">Notify when status changes</string>
     <string name="config_notify_when_stale">Notify when data &gt; 24 hours old</string>
     <string name="config_notify_on_odd">Notify on odd/unexpected API response</string>
