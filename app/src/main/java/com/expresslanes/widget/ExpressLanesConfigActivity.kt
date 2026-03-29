@@ -99,6 +99,8 @@ class ExpressLanesConfigActivity : AppCompatActivity() {
             prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_WHEN_STALE, WidgetPrefs.DEFAULT_NOTIFY_WHEN_STALE)
         findViewById<Switch>(R.id.switch_notify_odd).isChecked =
             prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_ON_ODD, WidgetPrefs.DEFAULT_NOTIFY_ON_ODD)
+        findViewById<Switch>(R.id.switch_notify_fallback_unexpected).isChecked =
+            prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_FALLBACK_UNEXPECTED, WidgetPrefs.DEFAULT_NOTIFY_FALLBACK_UNEXPECTED)
         findViewById<Switch>(R.id.switch_suppress_repeat).isChecked =
             prefs.getBoolean(WidgetPrefs.KEY_SUPPRESS_REPEAT, WidgetPrefs.DEFAULT_SUPPRESS_REPEAT)
 
@@ -195,6 +197,10 @@ class ExpressLanesConfigActivity : AppCompatActivity() {
             .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_CHANGE, findViewById<Switch>(R.id.switch_notify_change).isChecked)
             .putBoolean(WidgetPrefs.KEY_NOTIFY_WHEN_STALE, findViewById<Switch>(R.id.switch_notify_stale).isChecked)
             .putBoolean(WidgetPrefs.KEY_NOTIFY_ON_ODD, findViewById<Switch>(R.id.switch_notify_odd).isChecked)
+            .putBoolean(
+                WidgetPrefs.KEY_NOTIFY_FALLBACK_UNEXPECTED,
+                findViewById<Switch>(R.id.switch_notify_fallback_unexpected).isChecked
+            )
             .putBoolean(WidgetPrefs.KEY_SUPPRESS_REPEAT, findViewById<Switch>(R.id.switch_suppress_repeat).isChecked)
             .apply()
 

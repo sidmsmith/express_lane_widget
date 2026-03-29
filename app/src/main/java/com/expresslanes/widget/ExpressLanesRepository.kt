@@ -35,10 +35,11 @@ object ExpressLanesRepository {
                 }
                 FetchResult(
                     status = peach.status,
-                    isOddResponse = peach.isOdd,
+                    isOddResponse = peach.isUnexpected,
                     rawJson = rawForHistory,
                     lastUpdatedSeconds = primaryOutcome.lastUpdatedForStale,
-                    fromPeachPassFallback = true
+                    fromPeachPassFallback = true,
+                    isPeachPassUnexpected = peach.isUnexpected
                 )
             }
         }
@@ -96,7 +97,7 @@ object ExpressLanesRepository {
         }
     }
 
-    private data class PeachParse(val status: ExpressLaneStatus, val isOdd: Boolean, val rawJson: String)
+    private data class PeachParse(val status: ExpressLaneStatus, val isUnexpected: Boolean, val rawJson: String)
 
     private fun fetchPeachPassRaw(): PeachParse {
         return try {
@@ -113,7 +114,8 @@ object ExpressLanesRepository {
     }
 
     /**
-     * Parses [data].north: look for "open" plus "north" or "south" for direction (case-insensitive).
+     * Parses Peach Pass JSON: expects `success`, `data.north` string with open/closed cues and direction.
+     * [isUnexpected] is true when JSON is invalid, structure is wrong, or text does not clearly indicate state.
      */
     private fun parsePeachPassJson(body: String): PeachParse {
         return try {
@@ -121,11 +123,25 @@ object ExpressLanesRepository {
             if (!obj.optBoolean("success", false)) {
                 return PeachParse(ExpressLaneStatus.CLOSED, true, body)
             }
-            val data = obj.optJSONObject("data") ?: return PeachParse(ExpressLaneStatus.CLOSED, true, body)
-            val north = data.optString("north", "").lowercase()
+            val data = obj.optJSONObject("data")
+                ?: return PeachParse(ExpressLaneStatus.CLOSED, true, body)
+            if (!data.has("north")) {
+                return PeachParse(ExpressLaneStatus.CLOSED, true, body)
+            }
+            val north = data.optString("north", "").trim().lowercase()
+            if (north.isEmpty()) {
+                return PeachParse(ExpressLaneStatus.CLOSED, true, body)
+            }
             val hasOpen = "open" in north
-            if (!hasOpen) {
+            val hasClosed = "closed" in north
+            if (!hasOpen && !hasClosed) {
+                return PeachParse(ExpressLaneStatus.CLOSED, true, body)
+            }
+            if (hasClosed && !hasOpen) {
                 return PeachParse(ExpressLaneStatus.CLOSED, false, body)
+            }
+            if (hasOpen && hasClosed) {
+                return PeachParse(ExpressLaneStatus.CLOSED, true, body)
             }
             when {
                 "north" in north -> PeachParse(ExpressLaneStatus.NORTHBOUND, false, body)

@@ -16,10 +16,12 @@ object WidgetPrefs {
     const val KEY_NOTIFY_ON_CHANGE = "notify_on_status_change"
     const val KEY_NOTIFY_WHEN_STALE = "notify_when_stale"
     const val KEY_NOTIFY_ON_ODD = "notify_on_odd_response"
+    const val KEY_NOTIFY_FALLBACK_UNEXPECTED = "notify_fallback_unexpected"
     const val KEY_SUPPRESS_REPEAT = "suppress_repeat_notifications"
     const val KEY_LAST_STATUS = "last_status"
     const val KEY_LAST_WAS_STALE = "last_was_stale"
     const val KEY_LAST_WAS_ODD = "last_was_odd"
+    const val KEY_LAST_WAS_FALLBACK_UNEXPECTED = "last_was_fallback_unexpected"
     const val KEY_LAST_API_RESPONSE = "last_api_response"
     const val KEY_API_RESPONSE_HISTORY = "api_response_history"
 
@@ -35,6 +37,7 @@ object WidgetPrefs {
     const val DEFAULT_NOTIFY_ON_CHANGE = true
     const val DEFAULT_NOTIFY_WHEN_STALE = true
     const val DEFAULT_NOTIFY_ON_ODD = true
+    const val DEFAULT_NOTIFY_FALLBACK_UNEXPECTED = true
     const val DEFAULT_SUPPRESS_REPEAT = true
 
     const val STALE_THRESHOLD_SECONDS = 24L * 60 * 60  // 24 hours

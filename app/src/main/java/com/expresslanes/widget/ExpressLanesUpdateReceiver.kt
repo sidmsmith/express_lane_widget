@@ -40,17 +40,25 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                 val notifyWhenStale = prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_WHEN_STALE, WidgetPrefs.DEFAULT_NOTIFY_WHEN_STALE)
                 val notifyOnOdd = prefs.getBoolean(WidgetPrefs.KEY_NOTIFY_ON_ODD, WidgetPrefs.DEFAULT_NOTIFY_ON_ODD)
                 val suppressRepeat = prefs.getBoolean(WidgetPrefs.KEY_SUPPRESS_REPEAT, WidgetPrefs.DEFAULT_SUPPRESS_REPEAT)
+                val notifyFallbackUnexpected = prefs.getBoolean(
+                    WidgetPrefs.KEY_NOTIFY_FALLBACK_UNEXPECTED,
+                    WidgetPrefs.DEFAULT_NOTIFY_FALLBACK_UNEXPECTED
+                )
                 val lastWasStale = prefs.getBoolean(WidgetPrefs.KEY_LAST_WAS_STALE, false)
                 val lastWasOdd = prefs.getBoolean(WidgetPrefs.KEY_LAST_WAS_ODD, false)
+                val lastWasFallbackUnexpected = prefs.getBoolean(WidgetPrefs.KEY_LAST_WAS_FALLBACK_UNEXPECTED, false)
 
                 val isStale = result.lastUpdatedSeconds?.let { lastUp ->
                     val nowSec = System.currentTimeMillis() / 1000
                     nowSec - lastUp > WidgetPrefs.STALE_THRESHOLD_SECONDS
                 } ?: false
 
+                val primaryOdd = !result.fromPeachPassFallback && result.isOddResponse
+
                 val editor = prefs.edit()
                     .putBoolean(WidgetPrefs.KEY_LAST_WAS_STALE, isStale)
-                    .putBoolean(WidgetPrefs.KEY_LAST_WAS_ODD, result.isOddResponse)
+                    .putBoolean(WidgetPrefs.KEY_LAST_WAS_ODD, primaryOdd)
+                    .putBoolean(WidgetPrefs.KEY_LAST_WAS_FALLBACK_UNEXPECTED, result.isPeachPassUnexpected)
 
                 if (statusChanged && notifyOnChange) {
                     val msg = "NW Corridor: ${result.status.name}"
@@ -73,16 +81,30 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                     }
                 }
 
-                if (result.isOddResponse && notifyOnOdd) {
-                    val hasNetwork = hasValidNetworkConnection(context)
+                val hasNetwork = hasValidNetworkConnection(context)
+
+                if (primaryOdd && notifyOnOdd) {
                     val shouldNotify = hasNetwork && (!suppressRepeat || !lastWasOdd)
                     if (shouldNotify) {
                         val snippet = result.rawJson.take(500) + if (result.rawJson.length > 500) "…" else ""
                         NotificationHelper.show(
                             context,
                             "Odd API Response (NW Corridor)",
-                            "Unexpected response. Raw data:\n$snippet",
+                            "Unexpected 511 GA response. Raw data:\n$snippet",
                             NOTIFY_ODD
+                        )
+                    }
+                }
+
+                if (result.isPeachPassUnexpected && notifyFallbackUnexpected) {
+                    val shouldNotify = hasNetwork && (!suppressRepeat || !lastWasFallbackUnexpected)
+                    if (shouldNotify) {
+                        val snippet = result.rawJson.take(500) + if (result.rawJson.length > 500) "…" else ""
+                        NotificationHelper.show(
+                            context,
+                            "Peach Pass fallback: unexpected response",
+                            "Could not parse lane status from Peach Pass. Raw data:\n$snippet",
+                            NOTIFY_FALLBACK_UNEXPECTED
                         )
                     }
                 }
@@ -97,7 +119,8 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
                         isOddResponse = true,
                         rawJson = "Error: ${e.message}",
                         lastUpdatedSeconds = null,
-                        fromPeachPassFallback = false
+                        fromPeachPassFallback = false,
+                        isPeachPassUnexpected = false
                     )
                 )
                 WidgetPrefs.appendApiResponseHistory(context, "Error: ${e.message}")
@@ -151,6 +174,7 @@ class ExpressLanesUpdateReceiver : BroadcastReceiver() {
         private const val NOTIFY_CHANGE = 1
         private const val NOTIFY_STALE = 2
         private const val NOTIFY_ODD = 3
+        private const val NOTIFY_FALLBACK_UNEXPECTED = 4
         const val ACTION_UPDATE = "com.expresslanes.widget.UPDATE"
 
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

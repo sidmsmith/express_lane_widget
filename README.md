@@ -1,14 +1,15 @@
 # Express Lanes Widget
 
-Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status from the **511 GA API**, with a **Peach Pass** fallback when 511 fails or `LastUpdated` is older than 24 hours.
+Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status from the **511 GA API**, with a **Peach Pass** fallback when 511 is unavailable, unusable, or stale.
 
 ## Features
 
 - **Status icons**: **Green** up/down when 511 GA returns fresh data; **yellow** up/down when status comes from Peach Pass fallback; red X (Closed)
 - **Periodic updates**: Configurable 1, 3, 5, 15, 30, or 60 minute intervals via AlarmManager
-- **Single tap** (status arrow): Opens the main URL (default: 511ga.org), after a short delay so a double tap can be detected
-- **Double tap** (two taps within ~350 ms): Opens the double-tap URL (default: SRTA I-75 camera image)
-- **Notifications**: Optional alerts for status changes, stale data, and odd API responses
+- **Widget taps** (one icon, no separate camera button):
+  - **Single tap**: Opens the **main URL** (default `https://511ga.org`). There is a short delay (~350 ms) so a second tap can count as a double tap.
+  - **Double tap** (two taps within ~350 ms): Opens the **double-tap URL** (default SRTA traffic camera image). Configure both URLs in settings.
+- **Notifications**: Optional alerts for status changes, stale 511 data, odd 511 responses, and **unexpected Peach Pass fallback** responses (unparseable JSON or missing lane cues)
 - **Settings**: Tap the gear icon to configure update frequency, API key, main and double-tap URLs, and notification toggles
 - **Configuration on add**: Settings screen appears when the widget is first added
 
@@ -65,16 +66,17 @@ The config screen shows the **last 3 API responses** with timestamps (e.g., "Sun
 
 All notification types are optional and controlled by toggles in the config screen. **Tapping a notification opens the app** (config screen with API response history).
 
-- **Suppress repeated notifications** (default: ON): When enabled, Stale and Odd notifications fire only when you *transition into* that state—e.g., one Stale notification when data first goes stale, not every minute while it stays stale. Status change already fires only on actual changes.
-- **Repeat every time** (Suppress OFF): Stale and Odd notifications fire on every check that meets the condition.
+- **Suppress repeated notifications** (default: ON): When enabled, Stale, Odd (511), and Peach Pass unexpected notifications fire only when you *transition into* that state—not on every poll while the condition stays true. Status change already fires only on actual changes.
+- **Repeat every time** (Suppress OFF): Stale, Odd, and Peach Pass unexpected notifications fire on every check that meets the condition.
 
 | Notification | Toggle | When it fires |
 |--------------|--------|---------------|
 | **Status change** | Notify when status changes | Lane status changes between Northbound, Southbound, or Closed |
-| **Stale data** | Notify when data &gt; 24 hours old | API `LastUpdated` is older than 24 hours |
-| **Odd response** | Notify on odd/unexpected API response | Response doesn't match expected patterns; includes raw API snippet in the notification for debugging |
+| **Stale data** | Notify when data &gt; 24 hours old | 511 GA `LastUpdated` is older than 24 hours (suppressed when a valid Peach Pass fallback is in use) |
+| **Odd 511 response** | Notify on odd/unexpected 511 GA response | 75B entry does not match expected Description/Status patterns; includes raw snippet |
+| **Peach Pass unexpected** | Notify when Peach Pass fallback cannot be parsed | Fallback JSON/body is missing `data.north`, has no clear **open** or **closed** wording, says both open and closed, **open** without north/south direction, HTTP error, invalid JSON, or `success: false` |
 
-## Status Parsing Logic (75B)
+## Status Parsing Logic (75B, 511 GA primary)
 
 The widget parses the 511 GA API response using `Description` and `Status` fields. Logic is applied in order:
 
@@ -86,15 +88,44 @@ The widget parses the 511 GA API response using `Description` and `Status` field
 | Description contains "southbound" OR Status is "southbound" | Southbound | No |
 | Any other case (unexpected state) | Closed | Yes |
 
-When the result is marked **Odd? Yes**, an "odd response" notification is shown (if enabled), and the raw API JSON is saved for display in the config screen.
+When the result is marked **Odd? Yes**, an **odd 511** notification is shown (if enabled), and the raw API JSON is saved for display in the config screen.
 
 ## Peach Pass fallback
 
-If 511 GA is unreachable, returns HTTP error, has no 75B entry, parse is odd, or **75B `LastUpdated` is older than 24 hours**, the app calls:
+### Fallback URL (in code)
 
-`https://peachpass.com/wp-admin/admin-ajax.php?action=pp_lane_status`
+```
+https://peachpass.com/wp-admin/admin-ajax.php?action=pp_lane_status
+```
 
-It reads `data.north` (case-insensitive): requires **"open"** plus **"north"** or **"south"** to set direction; otherwise closed/odd. Fallback responses are logged in the config troubleshooting area (511 snapshot + Peach Pass body).
+### Why this fallback exists
+
+511 GA is used whenever it returns a **fresh** (within 24 hours), **parseable** 75B row. The widget switches to Peach Pass when any of the following is true:
+
+- Network or HTTP failure talking to 511 GA
+- Response is not valid JSON or has no **75B** (`Id == "75B"`) entry
+- 75B row parses as **odd** (unexpected Description/Status)
+- 75B **`LastUpdated`** is **older than 24 hours** (data treated as stale)
+
+Peach Pass publishes a lightweight AJAX endpoint that includes a `data.north` string describing northwest corridor / I-75 express lane status. It is **not** a government API contract; the app treats it as a best-effort backup when 511 is down or stale.
+
+### Parsing `data.north` (Peach Pass)
+
+Applied after `success: true` and a non-null `data` object:
+
+| Condition | Widget status | Unexpected? (notification) |
+|-----------|---------------|----------------------------|
+| Missing `data`, missing `north` key, empty `north`, or invalid JSON | Closed | Yes |
+| `success` is false | Closed | Yes |
+| HTTP error or network error | Closed | Yes |
+| `north` has neither **open** nor **closed** (case-insensitive) | Closed | Yes |
+| **closed** and no **open** | Closed | No |
+| Both **open** and **closed** | Closed | Yes (ambiguous) |
+| **open** and **north** (substring) | Northbound | No |
+| **open** and **south** (substring) | Southbound | No |
+| **open** but neither north nor south direction | Closed | Yes |
+
+When **Unexpected?** is **Yes**, the widget shows a **yellow** closed-style outcome (same as other fallback failures), logs the combined 511 snapshot + Peach Pass body in history, and can fire the **Peach Pass unexpected** notification (if enabled).
 
 ## Development
 

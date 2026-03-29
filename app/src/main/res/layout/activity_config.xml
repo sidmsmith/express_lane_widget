@@ -95,6 +95,12 @@
             android:text="@string/config_notify_on_odd" />
 
         <Switch
+            android:id="@+id/switch_notify_fallback_unexpected"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/config_notify_fallback_unexpected" />
+
+        <Switch
             android:id="@+id/switch_suppress_repeat"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
