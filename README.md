@@ -1,6 +1,6 @@
 # Express Lanes Widget
 
-Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status from the **511 GA API**, with a **Peach Pass** fallback when 511 is unavailable, unusable, or stale.
+Android widget that displays I-75 Northwest Corridor (75B) Express Lanes status using a temporary **Peach Pass-only mode** (511 call skipped). The 511 GA logic remains in code for quick re-enable later.
 
 ## Features
 
@@ -100,7 +100,7 @@ https://peachpass.com/wp-admin/admin-ajax.php?action=pp_lane_status
 
 ### Why this fallback exists
 
-511 GA is used whenever it returns a **fresh** (within 24 hours), **parseable** 75B row. The widget switches to Peach Pass when any of the following is true:
+The app is currently hardcoded to use Peach Pass only (for cleaner logs and reliability while 511 appears deprecated/unstable). The 511 logic is still kept in code for future re-enable; historically Peach Pass was used when any of the following was true:
 
 - Network or HTTP failure talking to 511 GA
 - Response is not valid JSON or has no **75B** (`Id == "75B"`) entry
@@ -146,3 +146,4 @@ git commit -m "Descriptive message" && git push origin main
 
 - Android 5.0 (API 21) or higher
 - Internet permission
+

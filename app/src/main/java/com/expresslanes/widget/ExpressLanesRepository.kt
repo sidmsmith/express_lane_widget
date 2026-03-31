@@ -19,7 +19,28 @@ object ExpressLanesRepository {
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
+    // Temporary ops switch: skip 511 GA entirely and use Peach Pass only.
+    // Keep existing 511 logic below for fast re-enable when needed.
+    private const val FORCE_PEACH_PASS_ONLY = true
+
     suspend fun fetchNorthwestCorridor(apiKey: String): FetchResult = withContext(Dispatchers.IO) {
+        if (FORCE_PEACH_PASS_ONLY) {
+            val peach = fetchPeachPassRaw()
+            val rawForHistory = buildString {
+                append("Peach Pass only mode: 511 GA call skipped.\n")
+                append("Peach Pass: ")
+                append(peach.rawJson)
+            }
+            return@withContext FetchResult(
+                status = peach.status,
+                isOddResponse = false,
+                rawJson = rawForHistory,
+                lastUpdatedSeconds = null,
+                fromPeachPassFallback = true,
+                isPeachPassUnexpected = peach.isUnexpected
+            )
+        }
+
         val primaryOutcome = run511Fetch(apiKey)
         when (primaryOutcome) {
             is Outcome511.UsePrimary -> primaryOutcome.result.copy(fromPeachPassFallback = false)
@@ -174,3 +195,4 @@ object ExpressLanesRepository {
         return ExpressLaneStatus.CLOSED to true
     }
 }
+
